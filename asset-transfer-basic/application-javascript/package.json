@@ -14,9 +14,12 @@
     "author": "Hyperledger",
     "license": "Apache-2.0",
     "dependencies": {
+        "cors": "^2.8.5",
         "express": "^4.18.2",
         "fabric-ca-client": "^2.2.4",
-        "fabric-network": "^2.2.4"
+        "fabric-network": "^2.2.4",
+        "file-upload": "^0.0.0",
+        "web3.storage": "^4.5.5"
     },
     "devDependencies": {
         "eslint": "^7.32.0"

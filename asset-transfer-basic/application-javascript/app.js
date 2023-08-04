@@ -184,6 +184,9 @@ const app = express();
 const port = 6000;
 const { Gateway, Wallets } = require('fabric-network');
 const FabricCAServices = require('fabric-ca-client');
+const cors = require('cors'); 
+// Enable CORS for all routes
+app.use(cors());
 
 // Import necessary functions from CAUtil.js and AppUtil.js
 const { buildCAClient, registerAndEnrollUser, enrollAdmin } = require('../../test-application/javascript/CAUtil.js');
