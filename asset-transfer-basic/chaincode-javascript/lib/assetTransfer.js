@@ -11,6 +11,8 @@ const stringify  = require('json-stringify-deterministic');
 const sortKeysRecursive  = require('sort-keys-recursive');
 const { Contract } = require('fabric-contract-api');
 
+let txId;
+
 class AssetTransfer extends Contract {
 
     async InitLedger(ctx) {
@@ -35,13 +37,14 @@ class AssetTransfer extends Contract {
             // use convetion of alphabetic order
             // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
             // when retrieving data, in any lang, the order of data will be the same and consequently also the corresonding hash
-            await ctx.stub.putState(asset.ID, Buffer.from(stringify(sortKeysRecursive(asset))));
+            await ctx.stub.putState(asset.ID, Buffer.from(JSON.stringify(asset)));
         }
     }
 
 
     async PushDocumentUpload(ctx, documentId, contributorKey, dateTimeStamp, documentType) {
         const txID = ctx.stub.getTxID(); // Get the Commit Hash (Transaction ID)
+        console.log(`Transaction ${txID} committed`); 
         const exists = await this.AssetExists(ctx, documentId);
         if (exists) {
             throw new Error(`The asset ${documentId} already exists`);
@@ -52,15 +55,17 @@ class AssetTransfer extends Contract {
         }
 
         const asset = {
-            ID: documentId,
-            ContributorKey: contributorKey,
-            DateTimeStamp: dateTimeStamp,
-            Type: documentType,
-            TxID: txID, // Include the transaction ID in the asset data
-        };
+          ID: documentId,
+          ContributorKey: contributorKey,
+          DateTimeStamp: dateTimeStamp,
+          Type: documentType,
+          TxID: txID,
+          Payments: [], // Initialize an empty array for payments
+      };
 
-        await ctx.stub.putState(documentId, Buffer.from(JSON.stringify(sortKeysRecursive(asset))));
-        return { asset: asset, txID: txID };
+      await ctx.stub.putState(documentId, Buffer.from(JSON.stringify(asset)));
+      return { asset: asset, txID: txID };
+
     }
 
  /*   // CreateAsset issues a new asset to the world state with given details.
@@ -80,32 +85,32 @@ class AssetTransfer extends Contract {
     }
 */
 async PushPaymentTransaction(ctx, documentId, paymentData) {
-    if (!documentId || !paymentData) {
-        throw new Error('Invalid input');
-    }
+  if (!documentId || !paymentData) {
+      throw new Error('Invalid input');
+  }
 
-    // Get the existing asset from the world state
-    const assetJSON = await ctx.stub.getState(documentId);
-    if (!assetJSON || assetJSON.length === 0) {
-        throw new Error(`The asset ${documentId} does not exist`);
-    }
-    const asset = JSON.parse(assetJSON.toString());
+  const assetJSON = await ctx.stub.getState(documentId);
+  if (!assetJSON || assetJSON.length === 0) {
+      throw new Error(`The asset ${documentId} does not exist`);
+  }
 
-    // Create a new payment transaction ID
-    const paymentTxID = ctx.stub.getTxID();
+  const asset = JSON.parse(assetJSON.toString());
 
-    // Serialize the payment data object before adding it to the asset
-    const paymentDataString = JSON.stringify(paymentData);
+  const paymentTxID = ctx.stub.getTxID();
 
-    // Add the payment data and the new transaction ID to the asset
-    asset.Payments = asset.Payments || [];
-    asset.Payments.push({ TxID: paymentTxID, PaymentData: paymentDataString });
+  asset.Payments.push({
+      TxID: paymentTxID,
+      PaymentData: paymentData,
+  });
 
-    // Update the asset in the world state with the new data
-    await ctx.stub.putState(documentId, Buffer.from(JSON.stringify(asset)));
+  console.log(`Transaction ${paymentTxID} committed`);
 
-    // Return a response with the message and the new transaction ID
-    return { message: `Payment transaction for Document ID ${documentId} has been recorded`, txID: paymentTxID };
+  await ctx.stub.putState(documentId, Buffer.from(JSON.stringify(asset)));
+
+  return {
+      message: `Payment transaction for Document ID ${documentId} has been recorded`,
+      txID: paymentTxID,
+  };
 }
 
 
@@ -212,15 +217,14 @@ async PushPaymentTransaction(ctx, documentId, paymentData) {
       }
 
       async pullPaymentsForDocument(ctx, documentId) {
-
-        if(!documentId) {
-          throw new Error('Invalid doc ID');  
+        if (!documentId) {
+            throw new Error('Invalid doc ID');
         }
     
         const query = {
-          selector: {
-            ID: documentId
-          }
+            selector: {
+                ID: documentId
+            }
         };
     
         const iterator = await ctx.stub.getQueryResult(JSON.stringify(query));
@@ -230,15 +234,20 @@ async PushPaymentTransaction(ctx, documentId, paymentData) {
         let result = await iterator.next();
     
         while (!result.done) {
-          if (result.value && result.value.value.toString()) {
-            results.push(JSON.parse(result.value.value.toString()));
+            if (result.value && result.value.value.toString()) {
+                const asset = JSON.parse(result.value.value.toString());
+                const payments = asset.Payments || [];
+                asset.Payments = payments.map((payment) => ({
+                  TxID: payment.TxID,
+                  PaymentData: payment.PaymentData
+              }));
+              results.push(asset);
           }
           result = await iterator.next();
-        }
+      }
     
         return JSON.stringify(results);
-    
-      }
+    }
 
           // Helper function to check if asset with given ID exists in world state.
     async AssetExists(ctx, documentId) {

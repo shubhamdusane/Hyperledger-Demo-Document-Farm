@@ -31,5 +31,5 @@ docker run -d --rm --name="logspout" \
 	gliderlabs/logspout
 sleep 3
 
-curl http://host:port/transactions 
+curl http://127.0.0.1:${PORT}/transactions 
 curl http://127.0.0.1:${PORT}/logs

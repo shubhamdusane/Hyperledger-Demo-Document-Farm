@@ -263,8 +263,7 @@ app.post('/api/pushDocumentUpload', async (req, res) => {
 	}
   });
   
-// API 2: Push Payment Transaction into Network
-app.post('/api/pushPaymentTransaction', async (req, res) => {
+  app.post('/api/pushPaymentTransaction', async (req, res) => {
 	const contract = await connectToNetwork();
   
 	try {
@@ -272,15 +271,16 @@ app.post('/api/pushPaymentTransaction', async (req, res) => {
 	  if (!documentID || !paymentData) {
 		throw new Error('Invalid input. Please provide all required fields.');
 	  }
-	  const result = await contract.submitTransaction('PushPaymentTransaction', documentID, paymentData);
+	  const result = await contract.submitTransaction('PushPaymentTransaction', documentID, JSON.stringify(paymentData)); // Convert paymentData to JSON string
 	  const response = JSON.parse(result.toString());
-	  const txID = response.txID; // Assuming the actual transaction hash is available in the response as `txID`
+	  const txID = response.txID;
+	  
 	  res.status(200).json({ transactionHash: txID, paymentData: paymentData });
 	} catch (error) {
 	  console.error('Error pushing payment transaction:', error);
 	  res.status(500).json({ error: 'Error pushing payment transaction' });
 	}
-  });
+});
   
 
 // API 3: Pull Document Upload Transactions from Network
@@ -320,11 +320,12 @@ app.get('/api/getAllAssets', async (req, res) => {
 	
 	try {
 	  const result = await contract.evaluateTransaction('GetAllAssets');
-	  const allAssets = JSON.parse(result.toString());
+	  const assets = JSON.parse(result);
   
-	  res.status(200).json({ assets: allAssets });
+	  res.json({assets});
 	} catch (error) {
 	  console.error('Error getting all assets:', error);
+	  console.log(error.payload);
 	  res.status(500).json({ error: 'Error getting all assets' });
 	}
   });
